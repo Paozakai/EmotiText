@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EmotiText — เกมทายอารมณ์จากข้อความ</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&family=Kanit:wght@400;700;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="bg-orbs">
+    <div class="orb orb1"></div>
+    <div class="orb orb2"></div>
+    <div class="orb orb3"></div>
+  </div>
+
+  <header class="header">
+    <div class="logo">
+      <span class="logo-icon">🧠</span>
+      <span class="logo-text">EmotiText</span>
+    </div>
+    <p class="header-sub">เกมทายอารมณ์จากข้อความด้วย NLP</p>
+  </header>
+
+  <main class="main">
+
+    <!-- Input Section -->
+    <section class="card input-card">
+      <h2 class="card-title">พิมพ์ข้อความของคุณ</h2>
+      <p class="card-desc">พิมพ์ข้อความภาษาไทย 1–3 ประโยค หรือกดปุ่มตัวอย่างด้านล่าง</p>
+      <textarea id="inputText" class="textarea" placeholder="เช่น: วันนี้เหนื่อยมากเลย ไม่ไหวแล้ว..." rows="4"></textarea>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="analyze()">🔍 วิเคราะห์อารมณ์</button>
+        <button class="btn btn-ghost" onclick="clearAll()">✕ ล้าง</button>
+      </div>
+
+      <div class="example-section">
+        <div class="example-label">🎯 ลองตัวอย่าง (คลิกแล้ววิเคราะห์เลย):</div>
+        <div class="example-grid">
+          <button class="example-btn joy"     onclick="quickAnalyze('ดีใจมาก ๆ สอบผ่านแล้ว!')">😄 สอบผ่านแล้ว</button>
+          <button class="example-btn sad"     onclick="quickAnalyze('วันนี้เหนื่อยมากเลย ไม่ไหวแล้ว')">😔 เหนื่อยมาก</button>
+          <button class="example-btn angry"   onclick="quickAnalyze('โกรธมากเลย ทนไม่ไหวแล้ว รำคาญจริง ๆ')">😠 โกรธมาก</button>
+          <button class="example-btn fear"    onclick="quickAnalyze('กลัวสอบไม่ผ่าน กังวลมากเลย')">😨 กลัวสอบ</button>
+          <button class="example-btn neutral" onclick="quickAnalyze('รู้สึกเฉย ๆ ไม่มีอะไรพิเศษ')">😐 เฉย ๆ</button>
+          <button class="example-btn ambig"   onclick="quickAnalyze('ดีใจมากเลยนะ ที่โดนยกเลิกงาน')">🤔 ประชด</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Pipeline Section -->
+    <section class="card pipeline-card" id="pipelineSection" style="display:none;">
+      <h2 class="card-title">⚙️ กระบวนการ NLP</h2>
+      <div class="pipeline">
+        <div class="pipe-step" id="step1">
+          <div class="pipe-icon">✂️</div>
+          <div class="pipe-info">
+            <div class="pipe-name">Step 1: Preprocessing</div>
+            <div class="pipe-detail" id="step1detail">Tokenization + Stopwords</div>
+          </div>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step" id="step2">
+          <div class="pipe-icon">📊</div>
+          <div class="pipe-info">
+            <div class="pipe-name">Step 2: Feature Extraction</div>
+            <div class="pipe-detail" id="step2detail">TF-IDF / Bag of Words</div>
+          </div>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step" id="step3">
+          <div class="pipe-icon">🤖</div>
+          <div class="pipe-info">
+            <div class="pipe-name">Step 3: Classification</div>
+            <div class="pipe-detail" id="step3detail">Naive Bayes / SVM</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-block">
+        <div class="block-label">🔤 Tokens หลังตัดคำ</div>
+        <div class="token-list" id="tokenList"></div>
+        <div class="token-legend">
+          <span class="legend-item"><span class="tok-demo">คำ</span> คำปกติ</span>
+          <span class="legend-item"><span class="tok-demo stopword">คำ</span> Stopword (ตัดทิ้ง)</span>
+        </div>
+      </div>
+
+      <div class="section-block">
+        <div class="block-label">🔑 Information Extraction</div>
+        <div class="kw-grid" id="kwGrid"></div>
+      </div>
+    </section>
+
+    <!-- Result Section -->
+    <section class="card result-card" id="resultSection" style="display:none;">
+      <h2 class="card-title">📊 ผลการวิเคราะห์</h2>
+
+      <div class="emotion-display" id="emotionDisplay">
+        <div class="emotion-emoji" id="resultEmoji">😐</div>
+        <div class="emotion-label" id="resultLabel">เฉย ๆ</div>
+        <div class="confidence-badge" id="confidenceBadge">ความมั่นใจ 0%</div>
+      </div>
+
+      <div class="ambiguity-box" id="ambiguityBox" style="display:none;">
+        <span class="amb-icon">⚠️</span>
+        <span id="ambiguityMsg"></span>
+      </div>
+
+      <div class="prob-section">
+        <div class="prob-title">ความน่าจะเป็นแต่ละอารมณ์ (Naive Bayes)</div>
+        <div id="probBars"></div>
+      </div>
+
+      <div class="cluster-box">
+        <span class="cluster-label">📁 Document Cluster:</span>
+        <span class="cluster-value" id="clusterValue">—</span>
+      </div>
+
+      <div class="kw-result">
+        <span class="kw-result-label">คำสำคัญที่ระบบใช้ตัดสิน:</span>
+        <span id="resultKeywords"></span>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer">EmotiText · NLP Emotion Analysis · ภาษาไทย + English</footer>
+
+  <!-- <script src="nlp.js"></script>
+  <script src="app.js"></script> -->
+  <script>
+    /**
+ * EmotiText NLP Engine (JavaScript Demo)
+ * -------------------------------------------------------
+ * Simulates the full NLP pipeline described in the report:
+ *   Step 1: Text Preprocessing (Tokenization + Stopword removal)
+ *   Step 2: Feature Extraction (TF-IDF / keyword weighting)
+ *   Step 3: Emotion Classification (Naive Bayes style scoring)
+ * Plus: Information Extraction, Document Clustering, Ambiguity Detection
+ *
+ * Language Resources used (as referenced in the report):
+ *   - Emotion Lexicon (Thai + English)
+ *   - Stopword List (Thai + English)
+ *   - Context keywords per cluster
+ *   - Ambiguity patterns
+ */
+
+// ─── STOPWORDS (Thai + English) ───────────────────────────────────────────────
+const STOPWORDS = new Set([
+  // Thai
+  'และ','ที่','ของ','ใน','มา','ไป','ให้','ได้','แต่','หรือ','เป็น','ว่า',
+  'จาก','นี้','ด้วย','ยัง','อยู่','ก็','แล้ว','มาก','เลย','นะ','ครับ',
+  'ค่ะ','นะคะ','นะครับ','เพราะ','แค่','เอง','เอา','ดัง','จะ','ทำ',
+  'วันนี้','มี','ไม่','เลย','มาก','มาก','เดี๋ยว','ตอน','ช่วง','นาน',
+  'ทุก','ยาก','ง่าย','อีก','ต้อง','ถ้า','เมื่อ','เพราะ','โดย','กับ',
+  // English
+  'i','me','my','the','a','an','is','are','was','were','be','been',
+  'do','does','did','have','has','had','will','would','can','could',
+  'not','no','so','very','really','just','now','today','this','that',
+]);
+
+// ─── EMOTION LEXICON ──────────────────────────────────────────────────────────
+// Each word maps to { emotion, weight }
+const EMOTION_LEXICON = {
+  // === JOY ===
+  'ดีใจ':     { emotion: 'joy', weight: 3.0 },
+  'สุข':      { emotion: 'joy', weight: 2.5 },
+  'สนุก':     { emotion: 'joy', weight: 2.5 },
+  'ยินดี':    { emotion: 'joy', weight: 2.8 },
+  'ผ่าน':     { emotion: 'joy', weight: 2.0 },
+  'สำเร็จ':   { emotion: 'joy', weight: 2.8 },
+  'ชนะ':      { emotion: 'joy', weight: 2.5 },
+  'รัก':      { emotion: 'joy', weight: 2.2 },
+  'ชอบ':      { emotion: 'joy', weight: 1.8 },
+  'เยี่ยม':   { emotion: 'joy', weight: 2.5 },
+  'เก่ง':     { emotion: 'joy', weight: 2.0 },
+  'ยิ้ม':     { emotion: 'joy', weight: 2.2 },
+  'หัวเราะ':  { emotion: 'joy', weight: 2.5 },
+  'happy':    { emotion: 'joy', weight: 2.5 },
+  'great':    { emotion: 'joy', weight: 2.0 },
+  'love':     { emotion: 'joy', weight: 2.5 },
+  'awesome':  { emotion: 'joy', weight: 2.5 },
+  'joy':      { emotion: 'joy', weight: 3.0 },
+
+  // === SADNESS ===
+  'เหนื่อย':   { emotion: 'sad', weight: 3.0 },
+  'ไหว':       { emotion: 'sad', weight: 1.5 },   // context: ไม่ไหว
+  'เศร้า':     { emotion: 'sad', weight: 3.0 },
+  'เสียใจ':    { emotion: 'sad', weight: 3.0 },
+  'แย่':       { emotion: 'sad', weight: 2.5 },
+  'ร้องไห้':   { emotion: 'sad', weight: 3.0 },
+  'โดดเดี่ยว': { emotion: 'sad', weight: 2.8 },
+  'ท้อ':       { emotion: 'sad', weight: 2.8 },
+  'หมดหวัง':   { emotion: 'sad', weight: 3.0 },
+  'เครียด':    { emotion: 'sad', weight: 2.2 },
+  'หนัก':      { emotion: 'sad', weight: 1.8 },
+  'เหนื่อยใจ': { emotion: 'sad', weight: 3.0 },
+  'sad':       { emotion: 'sad', weight: 3.0 },
+  'tired':     { emotion: 'sad', weight: 2.5 },
+  'depressed': { emotion: 'sad', weight: 3.0 },
+  'cry':       { emotion: 'sad', weight: 2.8 },
+
+  // === ANGER ===
+  'โกรธ':     { emotion: 'angry', weight: 3.0 },
+  'หัวร้อน':  { emotion: 'angry', weight: 2.8 },
+  'รำคาญ':    { emotion: 'angry', weight: 2.5 },
+  'เดือด':    { emotion: 'angry', weight: 2.8 },
+  'ไม่พอใจ':  { emotion: 'angry', weight: 2.8 },
+  'หัวร้าว':  { emotion: 'angry', weight: 2.5 },
+  'เกลียด':   { emotion: 'angry', weight: 3.0 },
+  'ชิงชัง':   { emotion: 'angry', weight: 2.8 },
+  'angry':    { emotion: 'angry', weight: 3.0 },
+  'hate':     { emotion: 'angry', weight: 3.0 },
+  'mad':      { emotion: 'angry', weight: 2.5 },
+  'furious':  { emotion: 'angry', weight: 3.0 },
+
+  // === FEAR ===
+  'กลัว':     { emotion: 'fear', weight: 3.0 },
+  'กังวล':    { emotion: 'fear', weight: 2.8 },
+  'ตื่นกลัว': { emotion: 'fear', weight: 3.0 },
+  'สั่น':     { emotion: 'fear', weight: 2.0 },
+  'วิตก':     { emotion: 'fear', weight: 2.8 },
+  'กลัวว่า':  { emotion: 'fear', weight: 2.5 },
+  'ไม่กล้า':  { emotion: 'fear', weight: 2.5 },
+  'ระแวง':    { emotion: 'fear', weight: 2.5 },
+  'fear':     { emotion: 'fear', weight: 3.0 },
+  'scared':   { emotion: 'fear', weight: 3.0 },
+  'afraid':   { emotion: 'fear', weight: 2.8 },
+  'nervous':  { emotion: 'fear', weight: 2.5 },
+
+  // === NEUTRAL ===
+  'เฉย':      { emotion: 'neutral', weight: 2.5 },
+  'ธรรมดา':   { emotion: 'neutral', weight: 2.0 },
+  'ปกติ':     { emotion: 'neutral', weight: 2.0 },
+  'โอเค':     { emotion: 'neutral', weight: 1.5 },
+  'ok':       { emotion: 'neutral', weight: 1.5 },
+  'fine':     { emotion: 'neutral', weight: 1.5 },
+  'okay':     { emotion: 'neutral', weight: 1.5 },
+  'neutral':  { emotion: 'neutral', weight: 2.5 },
+};
+
+// ─── AMBIGUITY PATTERNS ────────────────────────────────────────────────────────
+const AMBIGUITY_PATTERNS = [
+  {
+    pattern: /ดีใจ.{0,20}(ยกเลิก|ไม่ได้|เสีย|พัง|หลุด|ออก|โดน)/,
+    msg: '⚠️ Ambiguity: พบคำ "ดีใจ" แต่ตามด้วยบริบทเชิงลบ — อาจเป็นการประชด (Sarcasm)'
+  },
+  {
+    pattern: /ไม่.{0,5}(โกรธ|เกลียด|เศร้า|เสียใจ)/,
+    msg: '⚠️ Ambiguity: พบการปฏิเสธ "ไม่" นำหน้าคำอารมณ์ — ระบบอาจตีความผิดพลาด'
+  },
+  {
+    pattern: /^.{0,10}$/,
+    msg: '⚠️ Ambiguity: ข้อความสั้นเกินไป อาจตีความได้หลายอารมณ์'
+  },
+  {
+    pattern: /โอเค|ก็โอ|ไม่มีอะไร|เฉย/,
+    msg: '⚠️ Ambiguity: ข้อความกำกวม อาจตีความได้ทั้ง "เฉย ๆ" หรือ "สุขเล็กน้อย"'
+  },
+];
+
+// ─── NEGATION WORDS ───────────────────────────────────────────────────────────
+const NEGATIONS = ['ไม่', 'ไม่ได้', 'ไม่เคย', 'not', "n't", 'never'];
+
+// ─── DOCUMENT CLUSTERS ───────────────────────────────────────────────────────
+const CLUSTERS = {
+  joy:     { name: 'Cluster 1 — ความสุข',  examples: ['ดีใจมาก', 'วันนี้สนุกมาก', 'happy', 'great'] },
+  sad:     { name: 'Cluster 2 — ความเศร้า', examples: ['วันนี้เหนื่อยมาก', 'รู้สึกแย่มาก', 'tired', 'sad'] },
+  angry:   { name: 'Cluster 3 — ความโกรธ', examples: ['รำคาญมาก', 'เดือดดาล', 'angry', 'furious'] },
+  fear:    { name: 'Cluster 4 — ความกังวล', examples: ['กลัวสอบไม่ผ่าน', 'กังวลเรื่องพรีเซนต์', 'nervous'] },
+  neutral: { name: 'Cluster 5 — ความเป็นกลาง', examples: ['ก็โอเค', 'ธรรมดา', 'fine', 'okay'] },
+};
+
+// ─── EMOJI MAP ────────────────────────────────────────────────────────────────
+const EMOTION_EMOJI = {
+  joy: '😄', sad: '😔', angry: '😠', fear: '😨', neutral: '😐'
+};
+const EMOTION_LABEL_TH = {
+  joy: 'สุข 😄', sad: 'เศร้า 😔', angry: 'โกรธ 😠', fear: 'กลัว 😨', neutral: 'เฉย ๆ 😐'
+};
+const EMOTION_COLOR_CLASS = {
+  joy: 'color-joy', sad: 'color-sad', angry: 'color-angry', fear: 'color-fear', neutral: 'color-neutral'
+};
+
+// ─── MAIN NLP PIPELINE ────────────────────────────────────────────────────────
+
+/**
+ * Step 1: Tokenize Thai/English text
+ * Simulates PyThaiNLP-style tokenization (character-based Thai + whitespace English)
+ */
+function tokenize(text) {
+  // Normalize
+  const normalized = text.trim()
+    .replace(/[!?.,;:()[\]{}"'"""'']/g, ' ')
+    .replace(/\s+/g, ' ');
+
+  // Split on spaces (works for both Thai and English in this demo)
+  const raw = normalized.split(/\s+/).filter(Boolean);
+
+  // Mark each token
+  return raw.map(tok => ({
+    raw: tok,
+    lower: tok.toLowerCase(),
+    isStopword: STOPWORDS.has(tok) || STOPWORDS.has(tok.toLowerCase()),
+  }));
+}
+
+/**
+ * Step 2: Feature Extraction via lexicon lookup (simulates TF-IDF weighting)
+ * Returns keyword hits with their weights
+ */
+function extractFeatures(tokens, text) {
+  const hits = [];
+  const lowerText = text.toLowerCase();
+
+  // Check negation context
+  let negated = false;
+  for (let i = 0; i < tokens.length; i++) {
+    const tok = tokens[i];
+    if (NEGATIONS.includes(tok.lower)) {
+      negated = true;
+      continue;
+    }
+    // Check lexicon
+    if (EMOTION_LEXICON[tok.raw] || EMOTION_LEXICON[tok.lower]) {
+      const entry = EMOTION_LEXICON[tok.raw] || EMOTION_LEXICON[tok.lower];
+      hits.push({
+        word: tok.raw,
+        emotion: entry.emotion,
+        weight: negated ? entry.weight * -0.5 : entry.weight,
+        negated,
+      });
+      negated = false;
+    } else {
+      negated = false;
+    }
+  }
+
+  // Multi-word patterns
+  const multiPatterns = [
+    { pattern: /ไม่ไหว/, emotion: 'sad', weight: 3.5, word: 'ไม่ไหว' },
+    { pattern: /หมดแรง/, emotion: 'sad', weight: 3.0, word: 'หมดแรง' },
+    { pattern: /ไม่ดี/, emotion: 'sad', weight: 2.0, word: 'ไม่ดี' },
+    { pattern: /สอบผ่าน/, emotion: 'joy', weight: 3.5, word: 'สอบผ่าน' },
+    { pattern: /สอบไม่ผ่าน/, emotion: 'fear', weight: 3.0, word: 'สอบไม่ผ่าน' },
+    { pattern: /โดนยกเลิก/, emotion: 'angry', weight: 3.0, word: 'โดนยกเลิก' },
+    { pattern: /ก็โอเค|ก็โอ/, emotion: 'neutral', weight: 2.5, word: 'ก็โอเค' },
+    { pattern: /ไม่มีอะไรพิเศษ/, emotion: 'neutral', weight: 3.0, word: 'ไม่มีอะไรพิเศษ' },
+  ];
+  for (const p of multiPatterns) {
+    if (p.pattern.test(lowerText) || p.pattern.test(text)) {
+      // Check if not already added via single word
+      if (!hits.find(h => h.word === p.word)) {
+        hits.push({ word: p.word, emotion: p.emotion, weight: p.weight, negated: false });
+      }
+    }
+  }
+
+  return hits;
+}
+
+/**
+ * Step 3: Emotion Classification (Naive Bayes style scoring)
+ * Returns probability distribution across 5 emotions
+ */
+function classify(hits) {
+  const scores = { joy: 0.05, sad: 0.05, angry: 0.05, fear: 0.05, neutral: 0.1 };
+
+  for (const hit of hits) {
+    if (hit.weight > 0) scores[hit.emotion] += hit.weight;
+    else { // negative weight due to negation
+      scores[hit.emotion] = Math.max(0, scores[hit.emotion] + hit.weight);
+      scores.neutral += 0.3;
+    }
+  }
+
+  // Normalize to probability
+  const total = Object.values(scores).reduce((a, b) => a + b, 0);
+  const probs = {};
+  for (const k in scores) probs[k] = total > 0 ? scores[k] / total : 0.2;
+
+  // Winner
+  const winner = Object.keys(probs).reduce((a, b) => probs[a] > probs[b] ? a : b);
+  return { probs, winner };
+}
+
+/**
+ * Information Extraction: classify keywords by type
+ */
+function extractInfo(hits, tokens) {
+  const emotionKws = hits.map(h => h.word);
+  const contextKws = tokens
+    .filter(t => !t.isStopword && !emotionKws.includes(t.raw))
+    .map(t => t.raw)
+    .filter(w => w.length >= 2)
+    .slice(0, 4);
+  return { emotionKws, contextKws };
+}
+
+/**
+ * Ambiguity Detection
+ */
+function detectAmbiguity(text) {
+  for (const p of AMBIGUITY_PATTERNS) {
+    if (p.pattern.test(text)) return p.msg;
+  }
+  return null;
+}
+
+/**
+ * Main: run full pipeline
+ */
+function runNLP(text) {
+  const tokens = tokenize(text);
+  const hits = extractFeatures(tokens, text);
+  const { probs, winner } = classify(hits);
+  const info = extractInfo(hits, tokens);
+  const ambiguity = detectAmbiguity(text);
+  const cluster = CLUSTERS[winner];
+
+  return {
+    tokens,
+    hits,
+    probs,
+    winner,
+    info,
+    ambiguity,
+    cluster,
+    confidence: Math.round(probs[winner] * 100),
+  };
+}
+
+const PROB_LABELS = {
+  joy: 'สุข 😄',
+  sad: 'เศร้า 😔',
+  angry: 'โกรธ 😠',
+  fear: 'กลัว 😨',
+  neutral: 'เฉย ๆ 😐',
+};
+
+const COLOR_MAP = {
+  joy: '#ffd166',
+  sad: '#74b9ff',
+  angry: '#ff7675',
+  fear: '#a29bfe',
+  neutral: '#b2bec3',
+};
+
+// ─── Public API ───────────────────────────────────────────────────────────────
+
+/** Called by example buttons — fill textarea + auto-run */
+function quickAnalyze(text) {
+  const ta = document.getElementById('inputText');
+  ta.value = text;
+  // Reset previous state first
+  resetSections();
+  // Small delay so the user sees the text fill in
+  setTimeout(() => runAnalysis(text), 120);
+}
+
+/** Called by the main Analyze button */
+function analyze() {
+  const text = document.getElementById('inputText').value.trim();
+  if (!text) {
+    flashError();
+    return;
+  }
+  resetSections();
+  runAnalysis(text);
+}
+
+function clearAll() {
+  document.getElementById('inputText').value = '';
+  resetSections();
+}
+
+// ─── Internal ─────────────────────────────────────────────────────────────────
+
+function resetSections() {
+  document.getElementById('pipelineSection').style.display = 'none';
+  document.getElementById('resultSection').style.display = 'none';
+  ['step1', 'step2', 'step3'].forEach(id =>
+    document.getElementById(id).classList.remove('active')
+  );
+}
+
+function flashError() {
+  const ta = document.getElementById('inputText');
+  ta.style.borderColor = 'var(--angry)';
+  ta.focus();
+  setTimeout(() => { ta.style.borderColor = ''; }, 800);
+}
+
+async function runAnalysis(text) {
+  // Run NLP
+  const result = runNLP(text);
+
+  // Show pipeline card
+  const pipelineSection = document.getElementById('pipelineSection');
+  pipelineSection.style.display = 'block';
+  pipelineSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  // ── Step 1 ────────────────────────────────────────────────────────
+  await delay(150);
+  document.getElementById('step1').classList.add('active');
+  document.getElementById('step1detail').textContent =
+    `ตัดคำได้ ${result.tokens.length} tokens`;
+
+  const tokenList = document.getElementById('tokenList');
+  tokenList.innerHTML = '';
+  result.tokens.forEach((tok, i) => {
+    const span = document.createElement('span');
+    span.className = 'token' + (tok.isStopword ? ' stopword' : '');
+    span.textContent = tok.raw;
+    span.style.animationDelay = `${i * 50}ms`;
+    tokenList.appendChild(span);
+  });
+
+  await delay(550);
+
+  // ── Step 2 ────────────────────────────────────────────────────────
+  document.getElementById('step2').classList.add('active');
+  document.getElementById('step2detail').textContent =
+    `พบคำสำคัญ ${result.hits.length} คำ`;
+
+  const kwGrid = document.getElementById('kwGrid');
+  kwGrid.innerHTML = '';
+  result.info.emotionKws.forEach(w => {
+    kwGrid.appendChild(makeKwItem('🎭 Emotion Keyword', w, 'var(--accent2)'));
+  });
+  result.info.contextKws.forEach(w => {
+    kwGrid.appendChild(makeKwItem('📌 Context Keyword', w, 'var(--accent3)'));
+  });
+  if (kwGrid.children.length === 0) {
+    kwGrid.innerHTML = '<span style="color:var(--text-muted);font-size:.85rem">ไม่พบคำสำคัญที่ระบุอารมณ์ชัดเจน</span>';
+  }
+
+  await delay(550);
+
+  // ── Step 3 ────────────────────────────────────────────────────────
+  document.getElementById('step3').classList.add('active');
+  document.getElementById('step3detail').textContent =
+    `ผลลัพธ์: ${PROB_LABELS[result.winner].replace(/\s*[😄😔😠😨😐]/, '')} (${result.confidence}%)`;
+
+  await delay(350);
+
+  // ── Show Result ───────────────────────────────────────────────────
+  showResult(result);
+}
+
+function makeKwItem(type, word, color) {
+  const div = document.createElement('div');
+  div.className = 'kw-item';
+  div.innerHTML = `<div class="kw-type">${type}</div><div class="kw-word" style="color:${color}">${word}</div>`;
+  return div;
+}
+
+function showResult(result) {
+  const resultSection = document.getElementById('resultSection');
+  resultSection.style.display = 'block';
+
+  // Emotion display
+  const emoji = document.getElementById('resultEmoji');
+  emoji.textContent = EMOTION_EMOJI[result.winner];
+  // Re-trigger animation
+  emoji.style.animation = 'none';
+  emoji.offsetHeight; // reflow
+  emoji.style.animation = '';
+
+  document.getElementById('resultLabel').textContent =
+    PROB_LABELS[result.winner].replace(/\s*[😄😔😠😨😐]/, '');
+  document.getElementById('resultLabel').style.color = COLOR_MAP[result.winner];
+  document.getElementById('confidenceBadge').textContent =
+    `ความมั่นใจ ${result.confidence}%`;
+
+  // Border accent
+  document.getElementById('emotionDisplay').style.borderTop =
+    `3px solid ${COLOR_MAP[result.winner]}`;
+
+  // Ambiguity
+  const ambBox = document.getElementById('ambiguityBox');
+  if (result.ambiguity) {
+    ambBox.style.display = 'flex';
+    document.getElementById('ambiguityMsg').textContent = result.ambiguity;
+  } else {
+    ambBox.style.display = 'none';
+  }
+
+  // Probability bars
+  const probBars = document.getElementById('probBars');
+  probBars.innerHTML = '';
+  const sorted = Object.entries(result.probs).sort((a, b) => b[1] - a[1]);
+  sorted.forEach(([emotion, prob]) => {
+    const pct = Math.round(prob * 100);
+    const row = document.createElement('div');
+    row.className = 'prob-row';
+    row.innerHTML = `
+      <div class="prob-label">${PROB_LABELS[emotion].replace(/\s*[😄😔😠😨😐]/, '')}</div>
+      <div class="prob-bar-wrap">
+        <div class="prob-bar ${EMOTION_COLOR_CLASS[emotion]}" style="width:0%" data-pct="${pct}"></div>
+      </div>
+      <div class="prob-pct">${pct}%</div>
+    `;
+    probBars.appendChild(row);
+  });
+  setTimeout(() => {
+    document.querySelectorAll('.prob-bar').forEach(bar => {
+      bar.style.width = bar.dataset.pct + '%';
+    });
+  }, 80);
+
+  // Cluster
+  document.getElementById('clusterValue').textContent = result.cluster.name;
+
+  // Keywords
+  const kwResult = document.getElementById('resultKeywords');
+  kwResult.innerHTML = '';
+  const allKws = [...result.info.emotionKws, ...result.info.contextKws];
+  if (allKws.length > 0) {
+    allKws.forEach(w => {
+      const tag = document.createElement('span');
+      tag.className = 'kw-tag';
+      tag.textContent = w;
+      kwResult.appendChild(tag);
+    });
+  } else {
+    kwResult.innerHTML = '<span style="color:var(--text-muted)">—</span>';
+  }
+
+  resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Ctrl+Enter shortcut
+document.getElementById('inputText').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) analyze();
+});
+
+  </script>
+</body>
+</html>
